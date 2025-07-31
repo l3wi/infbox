@@ -11,6 +11,7 @@ help:
 	@echo "  make stop        - Stop all services"
 	@echo "  make logs        - View logs (all services)"
 	@echo "  make health      - Check service health"
+	@echo "  make test        - Test the API"
 	@echo "  make fetch-models - Download models"
 	@echo "  make clean       - Clean up containers and volumes"
 
@@ -27,6 +28,12 @@ start-dev:
 	cp .env.dev32 .env
 	docker-compose up -d
 	@echo "Dev stack started with Qwen2.5-Coder-32B"
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@make health
+	@echo ""
+	@echo "To view logs: make logs"
+	@echo "To test API: make test"
 
 # Start production profile  
 start-prod:
@@ -34,6 +41,12 @@ start-prod:
 	cp .env.prod480 .env
 	docker-compose up -d
 	@echo "Production stack started with Qwen3-Coder-480B"
+	@echo "Waiting for services to be ready..."
+	@sleep 10
+	@make health
+	@echo ""
+	@echo "To view logs: make logs"
+	@echo "To test API: make test"
 
 # Stop all services
 stop:
@@ -83,3 +96,7 @@ config:
 update:
 	docker-compose pull
 	docker-compose up -d
+
+# Test the API
+test:
+	@python test_api.py

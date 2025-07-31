@@ -14,26 +14,48 @@ A production-ready inference stack for large language models with real-time code
 
 ## Quick Start
 
-1. **Clone and setup**:
+### Option 1: One-Line Installation
 ```bash
-git clone <repo>
+# Run this on your GPU server:
+curl -sSL https://raw.githubusercontent.com/l3wi/infbox/main/quick_start.sh | sudo bash
+```
+
+### Option 2: Standard Deployment
+```bash
+git clone https://github.com/l3wi/infbox
 cd infbox
 ./bootstrap.sh
+make start-dev  # For single GPU
+# or
+make start-prod # For multi-GPU
 ```
 
-2. **Start the stack**:
+### Option 3: Automated Container Deployment
 ```bash
-# For development (single GPU, 32B model)
-make start-dev
+# Deploy everything in one command
+./deploy.sh native
 
-# For production (multi-GPU, 480B model)
-make start-prod
+# Or run in Docker-in-Docker mode
+./deploy.sh docker --workspace /path/to/code
+
+# Or deploy to remote server
+./deploy.sh ssh --host user@server.com
 ```
 
-3. **Access the API**:
+### Option 4: Cloud/Server Provisioning
+When provisioning a new server, use the container start script:
 ```bash
-curl http://localhost:8000/v1/models
+# This script handles everything automatically
+./container_start.sh
 ```
+
+The container start script will:
+- Install Docker and NVIDIA drivers
+- Detect GPU and select appropriate profile
+- Pull and build all images
+- Start all services
+- Test the API
+- Show access information
 
 ## Requirements
 

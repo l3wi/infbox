@@ -5,7 +5,7 @@ services:
     image: lmcache/vllm-openai:latest
     command: >
       python -m vllm.entrypoints.openai.api_server
-      --model ${MODEL_NAME}
+      ${MODEL_NAME}
       --tensor-parallel-size ${GPU_COUNT:-1}
       --dtype ${DTYPE:-auto}
       --kv-cache-dtype ${KV_CACHE_DTYPE:-fp16}

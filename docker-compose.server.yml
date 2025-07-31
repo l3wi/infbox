@@ -1,0 +1,45 @@
+version: "3.9"
+
+# This compose file runs the entire stack inside a single container
+# Useful for cloud deployments where you want everything pre-configured
+
+services:
+  llm-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    image: llm-inference-stack:latest
+    container_name: llm-inference-server
+    privileged: true  # Required for Docker-in-Docker
+    environment:
+      - GIT_REPO_URL=${GIT_REPO_URL:-}
+      - WORKSPACE_PATH=${WORKSPACE_PATH:-/workspace}
+      - KEEP_RUNNING=true
+    volumes:
+      # Docker socket for Docker-in-Docker
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persist data
+      - llm_models:/app/models
+      - llm_cache:/app/cache
+      - llm_logs:/app/logs
+      # Mount workspace (can be overridden)
+      - ${HOST_WORKSPACE:-~/}:/workspace:ro
+    ports:
+      # vLLM API
+      - "8000:8000"
+      # HTTP/HTTPS via Caddy
+      - "80:80"
+      - "443:443"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  llm_models:
+  llm_cache:
+  llm_logs:

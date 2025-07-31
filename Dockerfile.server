@@ -1,0 +1,41 @@
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    sudo \
+    systemctl \
+    gnupg \
+    lsb-release \
+    ca-certificates \
+    software-properties-common \
+    python3 \
+    python3-pip \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages for testing
+RUN pip3 install requests
+
+# Set working directory
+WORKDIR /app
+
+# Copy all project files
+COPY . /app/
+
+# Make scripts executable
+RUN chmod +x bootstrap.sh container_start.sh scripts/*.sh scripts/*.py
+
+# Environment variables that can be overridden
+ENV GIT_REPO_URL="https://github.com/l3wi/infbox"
+ENV WORKSPACE_PATH="/workspace"
+ENV KEEP_RUNNING="false"
+ENV INSTALL_DIR="/opt/infbox"
+
+# Use the container start script as entrypoint
+ENTRYPOINT ["/app/container_start.sh"]
