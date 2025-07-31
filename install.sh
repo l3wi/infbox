@@ -155,12 +155,18 @@ check_docker() {
         log "NVIDIA Container Toolkit not properly configured. Installing..."
         install_nvidia_container_toolkit
         
+        # Give Docker time to restart
+        log "Waiting for Docker to restart..."
+        sleep 5
+        
         # Test again after installation
-        sleep 2
+        log "Testing NVIDIA Container Toolkit..."
         if ! ${DOCKER_SUDO:-} docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi &> /dev/null 2>&1; then
-            error "NVIDIA Container Toolkit installation may have failed"
-            error "Please try rebooting and running the script again"
-            return 1
+            warn "NVIDIA Container Toolkit test failed. This might be resolved by a reboot."
+            warn "Continuing with installation anyway..."
+            warn "If vLLM fails to start, please reboot and run: cd $INSTALL_DIR && docker compose up -d"
+        else
+            log "NVIDIA Container Toolkit is working correctly"
         fi
     else
         log "NVIDIA Container Toolkit is properly configured"
