@@ -1,16 +1,18 @@
 services:
   vllm:
-    image: lmcache/vllm-openai:latest
+    image: vllm/vllm-openai:latest
     command: >
-      /models/Qwen_Qwen2.5-Coder-32B-Instruct-AWQ
+      ${MODEL_PATH:-/models/Qwen_Qwen3-Coder-480B-A35B-Instruct-FP8}
       --host 0.0.0.0
       --port 8000
-      --tensor-parallel-size ${GPU_COUNT:-1}
-      --dtype ${DTYPE:-auto}
+      --tensor-parallel-size ${GPU_COUNT:-4}
+      --dtype ${DTYPE:-float16}
       --max-model-len ${MAX_MODEL_LEN:-32768}
-      --gpu-memory-utilization ${GPU_UTIL:-0.85}
+      --gpu-memory-utilization ${GPU_UTIL:-0.90}
+      --quantization ${QUANTIZATION:-fp8}
+      --kv-cache-dtype ${KV_CACHE_DTYPE:-fp8}
       --enable-prefix-caching
-      --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
+      --trust-remote-code
     deploy:
       resources:
         reservations:
@@ -25,17 +27,11 @@ services:
     ports:
       - "${VLLM_PORT:-8000}:8000"
     environment:
-      - CUDA_VISIBLE_DEVICES=${CUDA_DEVICES:-}
+      - CUDA_VISIBLE_DEVICES=${CUDA_DEVICES:-0,1,2,3}
       - HF_HOME=/models
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
-      - LMCACHE_USE_EXPERIMENTAL=True
-      - LMCACHE_CHUNK_SIZE=256
-      - LMCACHE_LOCAL_CPU=True
-      - LMCACHE_MAX_LOCAL_CPU_SIZE=${CPU_GB:-20}
-      - TRITON_CACHE_DIR=/tmp/.triton
-      - VLLM_DISABLE_TRITON=false
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
       - VLLM_ATTENTION_BACKEND=${ATTENTION_BACKEND:-FLASH_ATTN}
-      - VLLM_USE_V1=${VLLM_USE_V1:-}
       - TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST:-}
     networks:
       - llm-network
