@@ -18,6 +18,9 @@ MODEL_NAME="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
 MODEL_SAFE_NAME="Qwen_Qwen3-Coder-480B-A35B-Instruct-FP8"
 INSTRUCTIONS_FILE="$HOME/INFBOX_README.txt"
 
+# Docker command prefix (set if we need sudo)
+DOCKER_SUDO=""
+
 # Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -67,36 +70,100 @@ check_nvidia() {
     return 0
 }
 
+install_docker() {
+    log "Installing Docker..."
+    curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+    sudo sh /tmp/get-docker.sh
+    sudo usermod -aG docker $USER
+    rm /tmp/get-docker.sh
+    
+    # Start Docker service
+    sudo systemctl start docker
+    sudo systemctl enable docker
+    
+    log "Docker installed successfully"
+    warn "Note: You may need to log out and back in for group changes to take effect"
+    
+    # For the current session, use sudo for docker commands
+    DOCKER_SUDO="sudo"
+}
+
+install_docker_compose() {
+    log "Installing Docker Compose v2..."
+    sudo apt-get update -qq
+    sudo apt-get install -y docker-compose-plugin
+    log "Docker Compose v2 installed successfully"
+}
+
+install_nvidia_container_toolkit() {
+    log "Installing NVIDIA Container Toolkit..."
+    
+    # Get distribution info
+    distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+    
+    # Add NVIDIA Container Toolkit repository
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    
+    curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+    
+    # Install the toolkit
+    sudo apt-get update -qq
+    sudo apt-get install -y nvidia-container-toolkit
+    
+    # Configure Docker runtime
+    sudo nvidia-ctk runtime configure --runtime=docker
+    sudo systemctl restart docker
+    
+    log "NVIDIA Container Toolkit installed successfully"
+}
+
 check_docker() {
     log "Checking Docker installation..."
+    
+    # Check if Docker is installed
     if ! command -v docker &> /dev/null; then
-        error "Docker is not installed."
-        info "Please install Docker first:"
-        info "  curl -fsSL https://get.docker.com | sudo sh"
-        info "  sudo usermod -aG docker \$USER"
-        info "Then log out and back in."
-        return 1
+        log "Docker not found. Installing Docker..."
+        install_docker
+    else
+        log "Docker is already installed"
+        
+        # Check if user needs sudo for docker
+        if ! docker ps &> /dev/null; then
+            if sudo docker ps &> /dev/null; then
+                log "Docker requires sudo (user not in docker group)"
+                DOCKER_SUDO="sudo"
+            else
+                error "Docker is not running or not accessible"
+                return 1
+            fi
+        fi
     fi
     
     # Check Docker Compose v2
-    if ! docker compose version &> /dev/null 2>&1; then
-        error "Docker Compose v2 is not installed."
-        info "Please install Docker Compose plugin:"
-        info "  sudo apt-get update && sudo apt-get install docker-compose-plugin"
-        return 1
+    if ! ${DOCKER_SUDO:-} docker compose version &> /dev/null 2>&1; then
+        log "Docker Compose v2 not found. Installing..."
+        install_docker_compose
+    else
+        log "Docker Compose v2 is already installed"
     fi
     
     # Check NVIDIA Container Toolkit
-    if ! docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi &> /dev/null 2>&1; then
-        error "NVIDIA Container Toolkit is not properly configured."
-        info "Please install NVIDIA Container Toolkit:"
-        info "  distribution=\$(. /etc/os-release;echo \$ID\$VERSION_ID)"
-        info "  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg"
-        info "  curl -s -L https://nvidia.github.io/libnvidia-container/\$distribution/libnvidia-container.list | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list"
-        info "  sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit"
-        info "  sudo nvidia-ctk runtime configure --runtime=docker"
-        info "  sudo systemctl restart docker"
-        return 1
+    log "Checking NVIDIA Container Toolkit..."
+    if ! ${DOCKER_SUDO:-} docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi &> /dev/null 2>&1; then
+        log "NVIDIA Container Toolkit not properly configured. Installing..."
+        install_nvidia_container_toolkit
+        
+        # Test again after installation
+        sleep 2
+        if ! ${DOCKER_SUDO:-} docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi &> /dev/null 2>&1; then
+            error "NVIDIA Container Toolkit installation may have failed"
+            error "Please try rebooting and running the script again"
+            return 1
+        fi
+    else
+        log "NVIDIA Container Toolkit is properly configured"
     fi
     
     return 0
@@ -104,6 +171,14 @@ check_docker() {
 
 check_system_requirements() {
     log "Checking system requirements..."
+    
+    # Check sudo access
+    if ! sudo -n true 2>/dev/null; then
+        sudo -v || {
+            error "This script requires sudo access for installing dependencies"
+            return 1
+        }
+    fi
     
     # Check OS
     if [ -f /etc/os-release ]; then
@@ -415,12 +490,12 @@ start_services() {
     cd "$INSTALL_DIR"
     
     # Stop any existing services
-    docker compose down 2>/dev/null || true
+    ${DOCKER_SUDO:-} docker compose down 2>/dev/null || true
     
     # Start services
-    if ! docker compose up -d; then
+    if ! ${DOCKER_SUDO:-} docker compose up -d; then
         error "Failed to start services"
-        error "Check logs with: cd $INSTALL_DIR && docker compose logs"
+        error "Check logs with: cd $INSTALL_DIR && ${DOCKER_SUDO:-} docker compose logs"
         exit 1
     fi
     
@@ -444,7 +519,7 @@ start_services() {
     
     if [ $attempt -eq $max_attempts ]; then
         error "vLLM failed to start within 10 minutes"
-        error "Check logs with: cd $INSTALL_DIR && docker compose logs vllm"
+        error "Check logs with: cd $INSTALL_DIR && ${DOCKER_SUDO:-} docker compose logs vllm"
         exit 1
     fi
     
