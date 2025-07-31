@@ -3,21 +3,17 @@ version: "3.9"
 services:
   vllm:
     image: lmcache/vllm-openai:latest
+    entrypoint: ["python", "-m", "vllm.entrypoints.openai.api_server"]
     command: >
-      python -m vllm.entrypoints.openai.api_server
-      ${MODEL_NAME}
+      --host 0.0.0.0
+      --port 8000
+      --model ${MODEL_NAME}
       --tensor-parallel-size ${GPU_COUNT:-1}
       --dtype ${DTYPE:-auto}
-      --kv-cache-dtype ${KV_CACHE_DTYPE:-fp16}
       --max-model-len ${MAX_MODEL_LEN:-32768}
       --gpu-memory-utilization ${GPU_UTIL:-0.85}
-      --port 8000
-      --host 0.0.0.0
       --enable-prefix-caching
-      --kv-transfer-config '{
-        "kv_connector": "LMCacheConnectorV1",
-        "kv_role": "kv_both"
-      }'
+      --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
     deploy:
       resources:
         reservations:
@@ -34,11 +30,11 @@ services:
     environment:
       - CUDA_VISIBLE_DEVICES=all
       - HF_HOME=/models
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+      - LMCACHE_USE_EXPERIMENTAL=True
       - LMCACHE_CHUNK_SIZE=256
-      - LMCACHE_LOCAL_CPU=true
+      - LMCACHE_LOCAL_CPU=True
       - LMCACHE_MAX_LOCAL_CPU_SIZE=${CPU_GB:-20}
-      - LMCACHE_LOCAL_DISK=/cache/lmcache
-      - LMCACHE_MAX_LOCAL_DISK_SIZE=${DISK_GB:-50}
     networks:
       - llm-network
     restart: unless-stopped
