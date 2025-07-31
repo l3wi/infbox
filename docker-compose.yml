@@ -35,6 +35,8 @@ services:
       - TRITON_CACHE_DIR=/tmp/.triton
       - VLLM_DISABLE_TRITON=false
       - VLLM_ATTENTION_BACKEND=${ATTENTION_BACKEND:-FLASH_ATTN}
+      - VLLM_USE_V1=${VLLM_USE_V1:-}
+      - TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST:-}
     networks:
       - llm-network
     restart: unless-stopped

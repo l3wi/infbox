@@ -138,15 +138,29 @@ detect_gpu_profile() {
     log "Detected $GPU_COUNT × $GPU_NAME with ${GPU_MEMORY}MB memory"
     
     # Auto-select profile based on GPU
-    if [ "$GPU_MEMORY" -ge 40000 ] && [ "$GPU_COUNT" -eq 1 ]; then
+    TOTAL_VRAM=$((GPU_MEMORY * GPU_COUNT / 1000))  # Total VRAM in GB
+    
+    if [ "$TOTAL_VRAM" -ge 280 ] && [ "$GPU_COUNT" -ge 2 ] && [[ "$GPU_NAME" == *"H200"* ]]; then
+        # H200 setup - can run compressed 480B model
+        PROFILE="h200"
+        log "Selected profile: h200 (Qwen3-Coder-480B compressed)"
+        log "Will use QuantTrio/Qwen3-Coder-480B-A35B-Instruct-AWQ"
+    elif [ "$TOTAL_VRAM" -ge 500 ] && [ "$GPU_COUNT" -ge 4 ]; then
+        # 500+ GB VRAM - could handle larger models
+        PROFILE="dev32"  # Still use 32B for now, but note the capacity
+        log "Selected profile: dev32 (Qwen2.5-Coder-32B-AWQ)"
+        log "Note: With ${TOTAL_VRAM}GB VRAM, you could run much larger models (70B-140B range)"
+        log "Consider models like: Qwen2.5-72B, Llama-3.1-70B, or Mixtral-8x22B"
+    elif [ "$GPU_MEMORY" -ge 40000 ] && [ "$GPU_COUNT" -eq 1 ]; then
         PROFILE="dev32"
         log "Selected profile: dev32 (single high-memory GPU)"
-    elif [ "$GPU_COUNT" -ge 4 ]; then
-        PROFILE="prod480"
-        log "Selected profile: prod480 (multi-GPU setup)"
     else
         PROFILE="dev32"
         log "Selected profile: dev32 (default)"
+    fi
+    
+    if [ "$GPU_COUNT" -gt 1 ]; then
+        log "Multi-GPU setup: Will use tensor parallelism across $GPU_COUNT GPUs"
     fi
 }
 
@@ -198,6 +212,45 @@ LOG_LEVEL=INFO
 EOF
     fi
     
+    if [ ! -f .env.h200 ]; then
+        cat > .env.h200 << 'EOF'
+# H200 configuration for compressed 480B model
+# Qwen3-Coder-480B compressed to 35B with AWQ
+
+# Model configuration
+MODEL_NAME=QuantTrio/Qwen3-Coder-480B-A35B-Instruct-AWQ
+PREC=bfloat16
+GPU_COUNT=2
+GPU_UTIL=0.97
+CUDA_DEVICES=0,1
+
+# Memory configuration
+CPU_GB=0
+DISK_GB=100
+
+# vLLM configuration
+MAX_MODEL_LEN=238000
+DTYPE=bfloat16
+KV_CACHE_DTYPE=fp8
+QUANTIZATION=awq_marlin
+VLLM_USE_V1=1
+TORCH_CUDA_ARCH_LIST=9.0
+
+# Service ports
+VLLM_PORT=8000
+
+# Workspace
+WORKSPACE_DIR=/root/infbox
+WATCH_INTERVAL=1
+
+# Model storage
+MODELS_PATH=./models
+
+# Logging
+LOG_LEVEL=INFO
+EOF
+    fi
+    
     if [ ! -f .env.prod480 ]; then
         cat > .env.prod480 << 'EOF'
 # Production configuration for multi-GPU cluster
@@ -239,6 +292,16 @@ EOF
     
     # Copy selected profile
     cp .env.$PROFILE .env
+    
+    # Update GPU count for multi-GPU setups
+    if [ "$GPU_COUNT" -gt 1 ]; then
+        sed -i "s/^GPU_COUNT=.*/GPU_COUNT=$GPU_COUNT/" .env
+        # Set CUDA devices based on GPU count
+        CUDA_DEVICES=$(seq -s, 0 $((GPU_COUNT-1)))
+        sed -i "s/^CUDA_DEVICES=.*/CUDA_DEVICES=$CUDA_DEVICES/" .env
+        log "Updated configuration for $GPU_COUNT GPUs"
+    fi
+    
     log "Environment configured with $PROFILE profile"
 }
 
@@ -419,6 +482,9 @@ services:
       --gpu-memory-utilization \${GPU_UTIL:-0.85}
       --enable-prefix-caching
       --enforce-eager
+      \${QUANTIZATION:+--quantization \$QUANTIZATION}
+      \${KV_CACHE_DTYPE:+--kv-cache-dtype \$KV_CACHE_DTYPE}
+      --trust-remote-code
     environment:
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 EOF
