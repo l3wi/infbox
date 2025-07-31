@@ -38,6 +38,22 @@ wait_for_service() {
 echo ""
 echo "=== Checking System Requirements ==="
 
+# Check Python installation
+if ! command_exists python3; then
+    echo "Python3 not found. Installing..."
+    apt-get update -qq
+    apt-get install -y python3 python3-pip
+    echo "✓ Python3 and pip3 installed"
+else
+    # Check pip separately
+    if ! command_exists pip3 && ! python3 -m pip --version &> /dev/null; then
+        echo "pip3 not found. Installing..."
+        apt-get update -qq
+        apt-get install -y python3-pip
+        echo "✓ pip3 installed"
+    fi
+fi
+
 # Check for NVIDIA GPU
 if ! command_exists nvidia-smi; then
     echo "ERROR: NVIDIA GPU not detected. This stack requires CUDA-capable GPUs."

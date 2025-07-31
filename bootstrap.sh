@@ -32,6 +32,25 @@ detect_gpu_profile() {
     fi
 }
 
+# Check Python installation
+check_python() {
+    if ! command -v python3 &> /dev/null; then
+        echo "Python3 not found. Installing..."
+        sudo apt-get update -qq
+        sudo apt-get install -y python3 python3-pip
+        echo "Python3 and pip3 installed"
+    else
+        echo "Python3 is already installed"
+        # Check pip separately
+        if ! command -v pip3 &> /dev/null && ! python3 -m pip --version &> /dev/null; then
+            echo "pip3 not found. Installing..."
+            sudo apt-get update -qq
+            sudo apt-get install -y python3-pip
+            echo "pip3 installed"
+        fi
+    fi
+}
+
 # Check Docker installation
 check_docker() {
     if ! command -v docker &> /dev/null; then
@@ -92,6 +111,7 @@ validate_env_files() {
 # Main execution
 main() {
     echo "Checking system requirements..."
+    check_python
     check_docker
     check_nvidia_toolkit
     
