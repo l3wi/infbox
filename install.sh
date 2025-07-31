@@ -254,6 +254,13 @@ download_model() {
         rm -rf "$MODEL_PATH"
     fi
     
+    # Ensure pip is installed
+    if ! python3 -m pip --version &>/dev/null 2>&1; then
+        log "Installing pip..."
+        sudo apt-get update -qq
+        sudo apt-get install -y python3-pip
+    fi
+    
     # Install huggingface-hub if needed
     if ! python3 -c "import huggingface_hub" 2>/dev/null; then
         log "Installing huggingface-hub..."
