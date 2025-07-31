@@ -71,20 +71,7 @@ health:
 # Fetch models
 fetch-models:
 	@echo "Fetching models based on current profile..."
-	@if [ ! -f .env ]; then cp .env.dev32 .env; fi
-	@MODEL_NAME=$$(grep "MODEL_NAME=" .env | cut -d'=' -f2); \
-	MODEL_DIR="models/$$(echo $$MODEL_NAME | tr '/' '_')"; \
-	if [ -d "$$MODEL_DIR" ] && [ -n "$$(ls -A $$MODEL_DIR 2>/dev/null)" ]; then \
-		echo "Model already exists at $$MODEL_DIR"; \
-		echo "Size: $$(du -sh $$MODEL_DIR | cut -f1)"; \
-	else \
-		echo "Downloading $$MODEL_NAME (approximately 65GB)..."; \
-		mkdir -p models; \
-		docker run --rm -v $$(pwd)/models:/models \
-			-e HF_HOME=/models \
-			vllm/vllm-openai:latest \
-			python -c "from huggingface_hub import snapshot_download; snapshot_download('$$MODEL_NAME', local_dir='/models/$$(echo $$MODEL_NAME | tr '/' '_')', local_dir_use_symlinks=False)"; \
-	fi
+	./download_model.sh
 
 # Clean up
 clean:

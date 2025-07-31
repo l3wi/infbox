@@ -21,7 +21,7 @@ services:
               count: all
               capabilities: [gpu]
     volumes:
-      - ./models:/models
+      - ${MODELS_PATH:-./models}:/models:ro
       - ./cache:/cache
       - ${WORKSPACE_HOST:-~/}:/workspace:ro
     ports:

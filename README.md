@@ -66,6 +66,24 @@ The container start script will:
 - CUDA 12.0+
 - Docker & Docker Compose
 
+## Model Management
+
+Models are downloaded to the host filesystem and mounted read-only into containers:
+
+```bash
+# Download model (65GB, ~30-60 minutes)
+make fetch-models
+
+# Or use a custom model path
+MODELS_PATH=/path/to/shared/models make start-dev
+```
+
+This approach allows:
+- Sharing models between multiple deployments
+- Preserving models when containers are rebuilt
+- Using existing model downloads
+- Mounting models from network storage
+
 ## Configuration
 
 The stack supports two presets via environment files:
