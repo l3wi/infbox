@@ -194,18 +194,63 @@ wait_for_service "vLLM" "http://localhost:8000/health"
 
 # 12. Download model if needed
 echo ""
-echo "=== Checking Model ==="
+echo "=== Model Management ==="
 MODEL_NAME=$(grep "MODEL_NAME=" .env | cut -d'=' -f2)
+MODEL_DIR="models/$(echo $MODEL_NAME | tr '/' '_')"
 echo "Model: $MODEL_NAME"
 
 # Check if model needs to be downloaded
-if [ ! -d "models/$(echo $MODEL_NAME | tr '/' '_')" ]; then
-    echo "Model not found locally. To download:"
-    echo "  make fetch-models"
+if [ ! -d "$MODEL_DIR" ] || [ -z "$(ls -A $MODEL_DIR 2>/dev/null)" ]; then
+    echo "Model not found locally."
     echo ""
-    echo "Note: Model download can take 30-60 minutes depending on size and connection"
+    
+    # Prompt for download
+    if [ "${AUTO_DOWNLOAD_MODEL:-true}" = "true" ]; then
+        echo "Starting automatic model download (approximately 65GB)..."
+        echo "This may take 30-60 minutes depending on your connection speed."
+        echo ""
+        
+        # Create models directory
+        mkdir -p models
+        
+        # Download using docker
+        docker run --rm \
+            -v $(pwd)/models:/models \
+            -e HF_HOME=/models \
+            -e HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-} \
+            vllm/vllm-openai:latest \
+            python -c "
+from huggingface_hub import snapshot_download
+import os
+model_name = '$MODEL_NAME'
+local_dir = '/models/$(echo $MODEL_NAME | tr '/' '_')'
+print(f'Downloading {model_name} to {local_dir}...')
+try:
+    snapshot_download(model_name, local_dir=local_dir, local_dir_use_symlinks=False)
+    print('✓ Model downloaded successfully!')
+except Exception as e:
+    print(f'✗ Download failed: {e}')
+    exit(1)
+"
+        
+        if [ $? -eq 0 ]; then
+            echo "✓ Model download complete"
+        else
+            echo "✗ Model download failed"
+            echo "You can retry with: make fetch-models"
+            echo "Continuing without model..."
+        fi
+    else
+        echo "Automatic download disabled. To download manually:"
+        echo "  make fetch-models"
+        echo ""
+        echo "Or set AUTO_DOWNLOAD_MODEL=true and run this script again"
+    fi
 else
     echo "✓ Model already present"
+    # Check size to ensure it's complete
+    size=$(du -sh "$MODEL_DIR" 2>/dev/null | cut -f1)
+    echo "  Size: $size"
 fi
 
 # 13. Show service status
