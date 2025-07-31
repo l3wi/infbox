@@ -1,0 +1,49 @@
+# Caddyfile for Multi-GPU LLM Inference Stack
+# Provides automatic HTTPS and reverse proxy
+
+# Replace with your domain
+:80 {
+    # Reverse proxy to vLLM
+    reverse_proxy /v1/* vllm:8000
+    
+    # Health endpoints
+    handle /health {
+        respond "OK" 200
+    }
+    
+    # Metrics endpoint (if enabled)
+    handle /metrics {
+        reverse_proxy vllm:8000
+    }
+    
+    # Default response
+    handle {
+        respond "Multi-GPU LLM Inference Stack" 200
+    }
+    
+    # Request/response logging
+    log {
+        output stdout
+        format console
+    }
+}
+
+# HTTPS configuration (when domain is set)
+# example.com {
+#     reverse_proxy /v1/* vllm:8000
+#     
+#     tls {
+#         protocols tls1.2 tls1.3
+#     }
+#     
+#     encode gzip
+#     
+#     header {
+#         # Security headers
+#         Strict-Transport-Security "max-age=31536000; includeSubDomains"
+#         X-Content-Type-Options "nosniff"
+#         X-Frame-Options "DENY"
+#         X-XSS-Protection "1; mode=block"
+#         Referrer-Policy "strict-origin-when-cross-origin"
+#     }
+# }
