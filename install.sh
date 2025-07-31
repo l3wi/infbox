@@ -1,9 +1,12 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 
 # InfBox Install Script for Qwen3-Coder-480B-A35B-Instruct-FP8
 # Single-command installation for multi-GPU inference stack
-# Usage: curl -L https://raw.githubusercontent.com/YOUR_REPO/infbox/main/install.sh | bash
+# Usage: curl -L https://raw.githubusercontent.com/l3wi/infbox/main/install.sh | bash
+
+# Ensure clean exit on errors
+trap 'echo "Installation interrupted. Please check the errors above and try again."' ERR
 
 # ================================
 # Configuration
@@ -36,7 +39,12 @@ check_nvidia() {
     if ! command -v nvidia-smi &> /dev/null; then
         error "NVIDIA drivers not found. Please install NVIDIA drivers first."
         error "Visit: https://docs.nvidia.com/datacenter/tesla/tesla-installation-notes/index.html"
-        exit 1
+        error ""
+        error "For Ubuntu, you can install drivers with:"
+        error "  sudo apt update"
+        error "  sudo apt install nvidia-driver-535"
+        error "  sudo reboot"
+        return 1
     fi
     
     # Get GPU info
@@ -53,8 +61,10 @@ check_nvidia() {
         error "Insufficient VRAM for Qwen3-Coder-480B model"
         error "Model requires at least 140GB VRAM, but system has ${TOTAL_VRAM}GB"
         error "Consider using a smaller model or adding more GPUs"
-        exit 1
+        return 1
     fi
+    
+    return 0
 }
 
 check_docker() {
@@ -65,7 +75,7 @@ check_docker() {
         info "  curl -fsSL https://get.docker.com | sudo sh"
         info "  sudo usermod -aG docker \$USER"
         info "Then log out and back in."
-        exit 1
+        return 1
     fi
     
     # Check Docker Compose v2
@@ -73,7 +83,7 @@ check_docker() {
         error "Docker Compose v2 is not installed."
         info "Please install Docker Compose plugin:"
         info "  sudo apt-get update && sudo apt-get install docker-compose-plugin"
-        exit 1
+        return 1
     fi
     
     # Check NVIDIA Container Toolkit
@@ -86,8 +96,10 @@ check_docker() {
         info "  sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit"
         info "  sudo nvidia-ctk runtime configure --runtime=docker"
         info "  sudo systemctl restart docker"
-        exit 1
+        return 1
     fi
+    
+    return 0
 }
 
 check_system_requirements() {
@@ -109,14 +121,16 @@ check_system_requirements() {
     # Check Python
     if ! command -v python3 &> /dev/null; then
         error "Python3 is not installed. Please install Python 3.8 or later."
-        exit 1
+        return 1
     fi
     
     # Check git
     if ! command -v git &> /dev/null; then
         error "Git is not installed. Please install git."
-        exit 1
+        return 1
     fi
+    
+    return 0
 }
 
 # ================================
@@ -463,9 +477,20 @@ EOF
     log "Starting InfBox installation..."
     
     # Check system requirements
-    check_system_requirements
-    check_nvidia
-    check_docker
+    if ! check_system_requirements; then
+        error "System requirements check failed. Please resolve the issues above and try again."
+        exit 1
+    fi
+    
+    if ! check_nvidia; then
+        error "NVIDIA requirements check failed. Please resolve the issues above and try again."
+        exit 1
+    fi
+    
+    if ! check_docker; then
+        error "Docker requirements check failed. Please resolve the issues above and try again."
+        exit 1
+    fi
     
     # Clone repository
     clone_repository
