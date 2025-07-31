@@ -27,7 +27,7 @@ services:
     ports:
       - "${VLLM_PORT:-8000}:8000"
     environment:
-      - CUDA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
       - HF_HOME=/models
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
       - LMCACHE_USE_EXPERIMENTAL=True
