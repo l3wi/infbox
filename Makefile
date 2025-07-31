@@ -53,8 +53,7 @@ logs-%:
 health:
 	@echo "Checking service health..."
 	@curl -s http://localhost:8000/health > /dev/null && echo "✓ vLLM is healthy" || echo "✗ vLLM is not responding"
-	@curl -s http://localhost:8100/health > /dev/null && echo "✓ LMCache is healthy" || echo "✗ LMCache is not responding"
-	@curl -s http://localhost:8200/health > /dev/null && echo "✓ Cake is healthy" || echo "✗ Cake is not responding"
+	@docker-compose ps
 
 # Fetch models
 fetch-models:

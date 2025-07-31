@@ -24,7 +24,6 @@ from gitignore_parser import parse_gitignore
 WATCH_DIR = os.getenv("WATCH_DIR", "/workspace")
 IGNORE_FILE = os.getenv("IGNORE_FILE", ".gitignore")
 VLLM_ENDPOINT = os.getenv("VLLM_ENDPOINT", "http://vllm:8000")
-LMCACHE_ENDPOINT = os.getenv("LMCACHE_ENDPOINT", "http://lmcache:8100")
 WATCH_INTERVAL = int(os.getenv("WATCH_INTERVAL", "1"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
@@ -109,30 +108,13 @@ class CodebaseWatcher(FileSystemEventHandler):
                     file_count += 1
         
         logger.info(f"Initial scan complete. Indexed {file_count} files")
-        self._update_cache(list(self.file_hashes.keys()), "initial_load")
+        # Note: With integrated LMCache, vLLM handles caching automatically
     
-    def _update_cache(self, files: list, operation: str):
-        """Update LMCache with file changes."""
-        try:
-            payload = {
-                "operation": operation,
-                "files": files,
-                "timestamp": datetime.utcnow().isoformat(),
-                "workspace": str(self.watch_dir)
-            }
-            
-            response = requests.post(
-                f"{LMCACHE_ENDPOINT}/update",
-                json=payload,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                logger.info(f"Cache updated: {operation} for {len(files)} files")
-            else:
-                logger.error(f"Cache update failed: {response.status_code}")
-        except Exception as e:
-            logger.error(f"Error updating cache: {e}")
+    def _notify_change(self, files: list, operation: str):
+        """Log file changes. With integrated LMCache, vLLM handles caching."""
+        logger.info(f"File {operation}: {len(files)} files changed")
+        # The integrated LMCache in vLLM will automatically handle KV caching
+        # when files are accessed through the API
     
     def on_created(self, event: FileSystemEvent):
         """Handle file creation."""
@@ -145,7 +127,7 @@ class CodebaseWatcher(FileSystemEventHandler):
             rel_path = filepath.relative_to(self.watch_dir)
             self.file_hashes[str(rel_path)] = file_hash
             logger.info(f"File created: {rel_path}")
-            self._update_cache([str(rel_path)], "create")
+            self._notify_change([str(rel_path)], "create")
     
     def on_modified(self, event: FileSystemEvent):
         """Handle file modification."""
@@ -161,7 +143,7 @@ class CodebaseWatcher(FileSystemEventHandler):
             if old_hash != file_hash:
                 self.file_hashes[str(rel_path)] = file_hash
                 logger.info(f"File modified: {rel_path}")
-                self._update_cache([str(rel_path)], "modify")
+                self._notify_change([str(rel_path)], "modify")
     
     def on_deleted(self, event: FileSystemEvent):
         """Handle file deletion."""
@@ -174,7 +156,7 @@ class CodebaseWatcher(FileSystemEventHandler):
         if str(rel_path) in self.file_hashes:
             del self.file_hashes[str(rel_path)]
             logger.info(f"File deleted: {rel_path}")
-            self._update_cache([str(rel_path)], "delete")
+            self._notify_change([str(rel_path)], "delete")
     
     def on_moved(self, event: FileSystemEvent):
         """Handle file move/rename."""
@@ -196,20 +178,14 @@ class CodebaseWatcher(FileSystemEventHandler):
         if file_hash:
             self.file_hashes[str(dst_rel)] = file_hash
             logger.info(f"File moved: {src_rel} -> {dst_rel}")
-            self._update_cache([str(src_rel), str(dst_rel)], "move")
+            self._notify_change([str(src_rel), str(dst_rel)], "move")
 
 def health_check():
     """Check service health."""
     try:
         # Check vLLM
         vllm_response = requests.get(f"{VLLM_ENDPOINT}/health", timeout=5)
-        vllm_healthy = vllm_response.status_code == 200
-        
-        # Check LMCache
-        lmcache_response = requests.get(f"{LMCACHE_ENDPOINT}/health", timeout=5)
-        lmcache_healthy = lmcache_response.status_code == 200
-        
-        return vllm_healthy and lmcache_healthy
+        return vllm_response.status_code == 200
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return False
@@ -219,7 +195,6 @@ def main():
     logger.info("Starting codebase watcher")
     logger.info(f"Watch directory: {WATCH_DIR}")
     logger.info(f"vLLM endpoint: {VLLM_ENDPOINT}")
-    logger.info(f"LMCache endpoint: {LMCACHE_ENDPOINT}")
     
     # Wait for services to be ready
     while not health_check():

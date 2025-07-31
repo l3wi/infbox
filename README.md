@@ -39,7 +39,7 @@ curl http://localhost:8000/v1/models
 
 - Ubuntu 22.04
 - NVIDIA GPU(s):
-  - Dev: 1x A6000/A100 (40GB+) or RTX 4090 (24GB)
+  - Dev: 1x A6000 (48GB), A100 (40GB+), or RTX 4090 (24GB)
   - Prod: 4x A100 (80GB) or equivalent
 - CUDA 12.0+
 - Docker & Docker Compose
@@ -61,24 +61,16 @@ The stack supports two presets via environment files:
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────┐     ┌─────────┐
-│   Caddy     │────▶│   vLLM   │────▶│ LMCache │
-│  (TLS/Proxy)│     │ (LLM API)│     │(KV Cache)│
-└─────────────┘     └──────────┘     └─────────┘
-                           │                │
-                           ▼                ▼
-                    ┌──────────┐     ┌─────────┐
-                    │  Watcher │     │  Cake   │
-                    │(File Mon)│     │(Adaptive)│
-                    └──────────┘     └─────────┘
+┌─────────────┐     ┌──────────────────┐     ┌──────────┐
+│   Caddy     │────▶│  vLLM + LMCache  │◀────│  Watcher │
+│  (TLS/Proxy)│     │   (Integrated)   │     │(File Mon)│
+└─────────────┘     └──────────────────┘     └──────────┘
 ```
 
 ## Services
 
-- **vLLM**: Main LLM inference server
-- **LMCache**: KV cache management (FP16)
-- **Cake**: Adaptive KV streaming
-- **Watcher**: File system monitoring
+- **vLLM**: Main LLM inference server with integrated LMCache for KV caching
+- **Watcher**: File system monitoring for code awareness
 - **Caddy**: Reverse proxy with auto-TLS
 
 ## Commands
@@ -107,7 +99,7 @@ client = openai.OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="Qwen/Qwen2.5-Coder-32B-Instruct-GPTQ-Int4",
+    model="Qwen/Qwen2.5-Coder-32B-Instruct",
     messages=[
         {"role": "user", "content": "Write a Python function to sort a list"}
     ]
@@ -117,10 +109,22 @@ response = client.chat.completions.create(
 ## File Watching
 
 The watcher service automatically:
-- Monitors the workspace directory
+- Monitors your home directory by default (`~/`)
 - Respects .gitignore patterns
 - Updates KV cache on file changes
 - Deduplicates using xxhash
+
+To change the monitored directory, edit `WORKSPACE_HOST` in `.env`:
+```bash
+# Monitor home directory (default)
+WORKSPACE_HOST=~/
+
+# Monitor specific project
+WORKSPACE_HOST=~/projects/myapp
+
+# Monitor absolute path
+WORKSPACE_HOST=/opt/code
+```
 
 ## Troubleshooting
 

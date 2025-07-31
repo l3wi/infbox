@@ -113,8 +113,12 @@ main() {
     echo ""
     echo "The system will be available at:"
     echo "  - vLLM API: http://localhost:8000"
-    echo "  - LMCache: http://localhost:8100"
-    echo "  - Cake Loader: http://localhost:8200"
+    echo "  - OpenAI-compatible endpoint: http://localhost:8000/v1"
+    echo ""
+    echo "Workspace monitoring:"
+    echo "  - Watching: $HOME (your home directory)"
+    echo "  - To change: edit WORKSPACE_HOST in .env"
+    echo "  - Examples: WORKSPACE_HOST=~/projects or WORKSPACE_HOST=/path/to/code"
 }
 
 # Run main function

@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   vllm:
-    image: vllm/vllm-openai:v0.6.0
+    image: lmcache/vllm-openai:latest
     command: >
       python -m vllm.entrypoints.openai.api_server
       --model ${MODEL_NAME}
@@ -14,11 +14,9 @@ services:
       --port 8000
       --host 0.0.0.0
       --enable-prefix-caching
-      --kv-connector-config '{
-        "connector_type": "LMCacheConnectorV1Dynamic",
-        "role": "kv_both",
-        "module_path": "lmcache.vllm.lmcache_connector",
-        "lmcache_url": "http://lmcache:8100"
+      --kv-transfer-config '{
+        "kv_connector": "LMCacheConnectorV1",
+        "kv_role": "kv_both"
       }'
     deploy:
       resources:
@@ -30,80 +28,37 @@ services:
     volumes:
       - ./models:/models
       - ./cache:/cache
-      - ./workspace:/workspace:ro
+      - ${WORKSPACE_HOST:-~/}:/workspace:ro
     ports:
       - "${VLLM_PORT:-8000}:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=all
       - HF_HOME=/models
+      - LMCACHE_CHUNK_SIZE=256
+      - LMCACHE_LOCAL_CPU=true
+      - LMCACHE_MAX_LOCAL_CPU_SIZE=${CPU_GB:-20}
+      - LMCACHE_LOCAL_DISK=/cache/lmcache
+      - LMCACHE_MAX_LOCAL_DISK_SIZE=${DISK_GB:-50}
     networks:
       - llm-network
     restart: unless-stopped
-    depends_on:
-      - lmcache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  lmcache:
-    image: lmcache/lmcache:v0.0.4
-    command: >
-      python -m lmcache.server
-      --host 0.0.0.0
-      --port 8100
-    environment:
-      - LMCACHE_BACKEND=local
-      - LMCACHE_CACHE_DIR=/cache/lmcache
-      - LMCACHE_CACHE_SIZE_GB=${CPU_GB:-20}
-      - LMCACHE_CHUNK_SIZE=256
-      - LMCACHE_DTYPE=fp16
-      - LMCACHE_LOG_LEVEL=${LOG_LEVEL:-INFO}
-    volumes:
-      - ./cache:/cache
-    ports:
-      - "${LMCACHE_PORT:-8100}:8100"
-    networks:
-      - llm-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  cake:
-    image: lmcache/lmcache:v0.0.4
-    command: >
-      python -m lmcache.adaptors.cake_adaptor
-      --host 0.0.0.0
-      --port 8200
-      --lmcache-url http://lmcache:8100
-      --mode adaptive
-      --min-ratio 0.2
-    environment:
-      - CAKE_LOG_LEVEL=${LOG_LEVEL:-INFO}
-    ports:
-      - "${CAKE_PORT:-8200}:8200"
-    networks:
-      - llm-network
-    restart: unless-stopped
-    depends_on:
-      - lmcache
-
   watcher:
     build:
       context: .
       dockerfile: Dockerfile.watcher
     volumes:
-      - ./workspace:/workspace:ro
+      - ${WORKSPACE_HOST:-~/}:/workspace:ro
       - ./scripts:/scripts:ro
     environment:
       - WATCH_DIR=${WORKSPACE_DIR:-/workspace}
       - IGNORE_FILE=.gitignore
       - VLLM_ENDPOINT=http://vllm:8000
-      - LMCACHE_ENDPOINT=http://lmcache:8100
       - WATCH_INTERVAL=${WATCH_INTERVAL:-1}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     networks:
@@ -111,7 +66,6 @@ services:
     restart: unless-stopped
     depends_on:
       - vllm
-      - lmcache
 
   caddy:
     image: caddy:2-alpine

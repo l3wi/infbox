@@ -11,9 +11,7 @@ from typing import Dict, Tuple
 
 # Service endpoints
 SERVICES = {
-    "vLLM": "http://localhost:8000/health",
-    "LMCache": "http://localhost:8100/health", 
-    "Cake": "http://localhost:8200/health"
+    "vLLM": "http://localhost:8000/health"
 }
 
 def check_service(name: str, url: str, timeout: int = 5) -> Tuple[bool, str]:
