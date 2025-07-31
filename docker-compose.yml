@@ -12,6 +12,7 @@ services:
       --max-model-len ${MAX_MODEL_LEN:-32768}
       --gpu-memory-utilization ${GPU_UTIL:-0.85}
       --enable-prefix-caching
+      --disable-v1
       --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}'
     deploy:
       resources:
