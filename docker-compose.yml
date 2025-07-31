@@ -1,10 +1,8 @@
-version: "3.9"
-
 services:
   vllm:
     image: lmcache/vllm-openai:latest
     command: >
-      ${MODEL_NAME}
+      /models/Qwen_Qwen2.5-Coder-32B-Instruct-AWQ
       --host 0.0.0.0
       --port 8000
       --tensor-parallel-size ${GPU_COUNT:-1}
@@ -23,7 +21,7 @@ services:
     volumes:
       - ${MODELS_PATH:-./models}:/models:ro
       - ./cache:/cache
-      - ${WORKSPACE_HOST:-~/}:/workspace:ro
+      - ${WORKSPACE_DIR:-/root/infbox}:${WORKSPACE_DIR:-/root/infbox}:ro
     ports:
       - "${VLLM_PORT:-8000}:8000"
     environment:
@@ -36,6 +34,7 @@ services:
       - LMCACHE_MAX_LOCAL_CPU_SIZE=${CPU_GB:-20}
       - TRITON_CACHE_DIR=/tmp/.triton
       - VLLM_DISABLE_TRITON=false
+      - VLLM_ATTENTION_BACKEND=${ATTENTION_BACKEND:-FLASH_ATTN}
     networks:
       - llm-network
     restart: unless-stopped
@@ -48,12 +47,12 @@ services:
   watcher:
     build:
       context: .
-      dockerfile: Dockerfile.watcher
+      dockerfile: docker/Dockerfile.watcher
     volumes:
-      - ${WORKSPACE_HOST:-~/}:/workspace:ro
+      - ${WORKSPACE_DIR:-/root/infbox}:${WORKSPACE_DIR:-/root/infbox}:ro
       - ./scripts:/scripts:ro
     environment:
-      - WATCH_DIR=${WORKSPACE_DIR:-/workspace}
+      - WATCH_DIR=${WORKSPACE_DIR:-/root/infbox}
       - IGNORE_FILE=.gitignore
       - VLLM_ENDPOINT=http://vllm:8000
       - WATCH_INTERVAL=${WATCH_INTERVAL:-1}
@@ -71,7 +70,7 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./config/Caddyfile:/etc/caddy/Caddyfile
       - caddy_data:/data
       - caddy_config:/config
     networks:

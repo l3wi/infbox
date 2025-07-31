@@ -12,10 +12,12 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Environment files (keep templates)
-.env
-!.env.dev32
-!.env.prod480
+# Environment files
+.env.local
+.env.*.local
+
+# Generated files
+docker-compose.override.yml
 
 # Logs
 logs/
@@ -54,3 +56,6 @@ node_modules/
 *.pem
 *.crt
 credentials.json
+
+# Claude files
+.claude/

@@ -77,7 +77,7 @@ check_nvidia() {
     if ! docker run --rm --gpus all nvidia/cuda:12.0-base nvidia-smi &> /dev/null 2>&1; then
         log "Installing NVIDIA Container Toolkit..."
         distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
         curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
             sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
             sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
@@ -86,6 +86,43 @@ check_nvidia() {
         sudo apt-get install -y nvidia-container-toolkit
         sudo nvidia-ctk runtime configure --runtime=docker
         sudo systemctl restart docker
+    fi
+}
+
+install_flashinfer() {
+    log "Checking FlashInfer installation..."
+    
+    # Check if already installed
+    if python3 -c "import flashinfer" 2>/dev/null; then
+        log "FlashInfer already installed"
+        return 0
+    fi
+    
+    log "Installing FlashInfer for optimized attention..."
+    
+    # Get CUDA version
+    CUDA_VERSION=$(nvidia-smi | grep "CUDA Version" | awk '{print $9}' | cut -d. -f1,2)
+    log "Detected CUDA version: $CUDA_VERSION"
+    
+    # Install FlashInfer based on CUDA version
+    case "$CUDA_VERSION" in
+        "12.0"|"12.1"|"12.2"|"12.3"|"12.4")
+            pip3 install flashinfer -i https://flashinfer.ai/whl/cu124/torch2.4/
+            ;;
+        "11.8")
+            pip3 install flashinfer -i https://flashinfer.ai/whl/cu118/torch2.4/
+            ;;
+        *)
+            warn "CUDA $CUDA_VERSION might not be fully supported by FlashInfer"
+            pip3 install flashinfer -i https://flashinfer.ai/whl/cu124/torch2.4/
+            ;;
+    esac
+    
+    # Verify installation
+    if python3 -c "import flashinfer" 2>/dev/null; then
+        log "✓ FlashInfer installed successfully"
+    else
+        warn "FlashInfer installation failed. Will use fallback attention backend."
     fi
 }
 
@@ -475,6 +512,7 @@ EOF
     check_python
     check_docker
     check_nvidia
+    install_flashinfer
     
     # GPU detection
     detect_gpu_profile

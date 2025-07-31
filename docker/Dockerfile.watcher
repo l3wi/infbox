@@ -18,6 +18,6 @@ RUN pip install --no-cache-dir \
     httpx==0.27.0
 
 # Copy watcher script
-COPY scripts/watch_codebase.py /app/
+COPY scripts/watchers/watch_codebase_enhanced.py /app/
 
-CMD ["python", "-u", "/app/watch_codebase.py"]
+CMD ["python", "-u", "/app/watch_codebase_enhanced.py"]
