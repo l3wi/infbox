@@ -4,8 +4,14 @@ One-command setup for high-performance LLM inference with automatic GPU detectio
 
 ## Quick Start
 
+### One-line install (Qwen3-Coder-480B):
 ```bash
-git clone https://github.com/yourusername/infbox.git
+curl -L https://raw.githubusercontent.com/l3wi/infbox/main/install.sh | bash
+```
+
+### Or clone and setup manually:
+```bash
+git clone https://github.com/l3wi/infbox.git
 cd infbox
 make setup
 ```

@@ -3,7 +3,7 @@
 One-line installation for Qwen3-Coder-480B inference stack:
 
 ```bash
-curl -L https://raw.githubusercontent.com/YOUR_REPO/infbox/main/install.sh | bash
+curl -L https://raw.githubusercontent.com/l3wi/infbox/main/install.sh | bash
 ```
 
 ## What it does
@@ -44,7 +44,7 @@ If you prefer to install step by step:
 
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_REPO/infbox.git
+git clone https://github.com/l3wi/infbox.git
 cd infbox
 
 # Run the install script locally

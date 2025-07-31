@@ -8,7 +8,7 @@ set -euo pipefail
 # ================================
 # Configuration
 # ================================
-REPO_URL="https://github.com/YOUR_REPO/infbox.git"
+REPO_URL="https://github.com/l3wi/infbox.git"
 INSTALL_DIR="$HOME/infbox"
 MODELS_DIR="$HOME/models"
 MODEL_NAME="Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8"
