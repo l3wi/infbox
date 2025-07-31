@@ -1,77 +1,54 @@
 # InfBox - Multi-GPU Code-Aware LLM Inference Stack
-.PHONY: help start stop restart logs clean test setup
+.PHONY: help setup start stop restart logs clean status health
 
 # Default target
 help:
-	@echo "InfBox Management Commands:"
-	@echo "  make setup      - Run bootstrap script to set up everything"
-	@echo "  make start      - Start standard inference stack"
-	@echo "  make start-opt  - Start optimized stack (hierarchical caching)"
-	@echo "  make start-lm   - Start LMCache stack (individual file caching)"
-	@echo "  make stop       - Stop all services"
-	@echo "  make restart    - Restart all services"
-	@echo "  make logs       - View logs (all services)"
-	@echo "  make logs-vllm  - View vLLM logs"
-	@echo "  make logs-watch - View watcher logs"
-	@echo "  make test       - Run tests"
-	@echo "  make clean      - Clean up containers and volumes"
-	@echo "  make status     - Show service status"
+	@echo "InfBox Commands:"
+	@echo "  make setup    - Run bootstrap script (auto-setup everything)"
+	@echo "  make start    - Start services"
+	@echo "  make stop     - Stop services"
+	@echo "  make restart  - Restart services"
+	@echo "  make logs     - View logs (all services)"
+	@echo "  make status   - Show service status"
+	@echo "  make health   - Quick health check"
+	@echo "  make clean    - Clean up containers"
 
-# Setup
+# One-command setup
 setup:
 	@./bootstrap.sh
 
-# Start services
+# Service management
 start:
 	@docker compose up -d
-	@echo "✅ Standard stack started"
+	@echo "✅ InfBox started"
 	@echo "   API: http://localhost:8000"
 
-start-opt:
-	@docker compose -f config/docker-compose.optimized.yml up -d
-	@echo "✅ Optimized stack started (hierarchical caching)"
-	@echo "   API: http://localhost:8000"
-
-start-lm:
-	@docker compose -f config/docker-compose.lmcache.yml up -d
-	@echo "✅ LMCache stack started (individual file caching)"
-	@echo "   API: http://localhost:8000"
-
-# Stop services
 stop:
 	@docker compose down
-	@docker compose -f config/docker-compose.optimized.yml down 2>/dev/null || true
-	@docker compose -f config/docker-compose.lmcache.yml down 2>/dev/null || true
-	@echo "✅ All services stopped"
+	@echo "✅ Services stopped"
 
-# Restart services
 restart: stop start
 
-# View logs
+# Logs
 logs:
 	@docker compose logs -f
 
 logs-vllm:
 	@docker compose logs -f vllm
 
-logs-watch:
+logs-watcher:
 	@docker compose logs -f watcher
 
-# Test
-test:
-	@echo "Running caching tests..."
-	@python scripts/tests/test_prefix_caching.py
-	@python scripts/tests/test_lmcache_access.py
+# Status and health
+status:
+	@docker compose ps
 
-test-api:
-	@curl -s http://localhost:8000/health || echo "❌ API not responding"
-	@curl -s http://localhost:8000/v1/models | jq . || echo "❌ Models endpoint failed"
+health:
+	@curl -s http://localhost:8000/health && echo " ✅ vLLM healthy" || echo " ❌ vLLM not responding"
 
-# Clean up
+# Cleanup
 clean:
 	@docker compose down -v
-	@docker compose -f config/docker-compose.optimized.yml down -v 2>/dev/null || true
-	@docker compose -f config/docker-compose.lmcache.yml down -v 2>/dev/null || true
 	@echo "✅ Cleaned up containers and volumes"
 
 clean-models:
@@ -82,22 +59,3 @@ clean-models:
 		rm -rf models/*; \
 		echo "✅ Models deleted"; \
 	fi
-
-# Status
-status:
-	@echo "Service Status:"
-	@docker compose ps
-	@echo ""
-	@echo "Cache Statistics:"
-	@docker compose logs watcher | grep "Cache stats" | tail -1 || echo "No cache stats available"
-
-# Development
-shell-vllm:
-	@docker compose exec vllm bash
-
-shell-watcher:
-	@docker compose exec watcher bash
-
-# Quick health check
-health:
-	@curl -s http://localhost:8000/health && echo " ✅ vLLM healthy" || echo " ❌ vLLM not responding"
