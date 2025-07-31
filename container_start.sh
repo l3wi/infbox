@@ -143,6 +143,14 @@ else
     cp .env.dev32 .env
 fi
 
+# Auto-generate CUDA_DEVICES based on GPU count
+if [ "$GPU_COUNT" -gt 1 ]; then
+    # Generate comma-separated list: 0,1,2,3...
+    CUDA_DEVICES=$(seq -s, 0 $((GPU_COUNT-1)))
+    echo "✓ Setting CUDA_DEVICES=$CUDA_DEVICES"
+    sed -i "s/CUDA_DEVICES=.*/CUDA_DEVICES=$CUDA_DEVICES/" .env
+fi
+
 # Set workspace to home directory
 if [ -n "${WORKSPACE_PATH:-}" ]; then
     sed -i "s|WORKSPACE_HOST=.*|WORKSPACE_HOST=${WORKSPACE_PATH}|" .env
