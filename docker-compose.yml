@@ -4,9 +4,9 @@ services:
   vllm:
     image: lmcache/vllm-openai:latest
     command: >
+      ${MODEL_NAME}
       --host 0.0.0.0
       --port 8000
-      --model ${MODEL_NAME}
       --tensor-parallel-size ${GPU_COUNT:-1}
       --dtype ${DTYPE:-auto}
       --max-model-len ${MAX_MODEL_LEN:-32768}
