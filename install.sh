@@ -248,12 +248,85 @@ download_model() {
     if [ -d "$MODEL_PATH" ] && [ -n "$(ls -A "$MODEL_PATH" 2>/dev/null)" ]; then
         size=$(du -sh "$MODEL_PATH" | cut -f1)
         log "Model already exists at $MODEL_PATH (size: $size)"
-        read -p "Skip model download? (Y/n) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            return 0
+        
+        # Verify model integrity
+        log "Verifying model integrity..."
+        
+        # First check basic file structure
+        EXPECTED_FILES=("config.json" "tokenizer.json" "model.safetensors.index.json")
+        MISSING_FILES=()
+        
+        for file in "${EXPECTED_FILES[@]}"; do
+            if [ ! -f "$MODEL_PATH/$file" ]; then
+                MISSING_FILES+=("$file")
+            fi
+        done
+        
+        if [ ${#MISSING_FILES[@]} -gt 0 ]; then
+            warn "Missing critical files: ${MISSING_FILES[*]}"
+            warn "Model appears incomplete"
+            read -p "Re-download model? (Y/n) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                rm -rf "$MODEL_PATH"
+            else
+                warn "Proceeding with incomplete model"
+                return 0
+            fi
+        elif python3 -c "
+import os
+import sys
+import json
+from pathlib import Path
+
+model_path = Path('$MODEL_PATH')
+
+# Check if we have model shards
+try:
+    with open(model_path / 'model.safetensors.index.json', 'r') as f:
+        index = json.load(f)
+        weight_map = index.get('weight_map', {})
+        
+    # Get unique shard files
+    shard_files = set(weight_map.values())
+    missing_shards = []
+    
+    for shard in shard_files:
+        if not (model_path / shard).exists():
+            missing_shards.append(shard)
+    
+    if missing_shards:
+        print(f'✗ Missing {len(missing_shards)} model shard files')
+        sys.exit(1)
+    else:
+        print(f'✓ All {len(shard_files)} model shards present')
+        sys.exit(0)
+except Exception as e:
+    # Fallback - just check if we have safetensors files
+    safetensors_files = list(model_path.glob('*.safetensors*'))
+    if len(safetensors_files) > 0:
+        print(f'✓ Found {len(safetensors_files)} model files')
+        sys.exit(0)
+    else:
+        print('✗ No model files found')
+        sys.exit(1)
+" 2>/dev/null; then
+            read -p "Model verified. Skip re-download? (Y/n) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                return 0
+            fi
+        else
+            warn "Model verification failed. Files may be corrupted."
+            read -p "Re-download model? (Y/n) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                rm -rf "$MODEL_PATH"
+            else
+                warn "Proceeding with potentially corrupted model files"
+                return 0
+            fi
         fi
-        rm -rf "$MODEL_PATH"
     fi
     
     # Ensure pip is installed
@@ -266,7 +339,7 @@ download_model() {
     # Install huggingface-hub if needed
     if ! python3 -c "import huggingface_hub" 2>/dev/null; then
         log "Installing huggingface-hub..."
-        python3 -m pip install --user huggingface-hub tqdm
+        python3 -m pip install --user "huggingface-hub[cli]" tqdm
     fi
     
     log "Downloading model to: $MODEL_PATH"
