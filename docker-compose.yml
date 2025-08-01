@@ -11,8 +11,11 @@ services:
       --gpu-memory-utilization ${GPU_UTIL:-0.90}
       --quantization ${QUANTIZATION:-fp8}
       --kv-cache-dtype ${KV_CACHE_DTYPE:-fp8}
+      --cpu-offload-gb ${CPU_GB:-0}
       --enable-prefix-caching
       --trust-remote-code
+      --enable-auto-tool-choice
+      --tool-call-parser qwen3_coder
     deploy:
       resources:
         reservations:
@@ -32,7 +35,8 @@ services:
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
       - VLLM_ATTENTION_BACKEND=${ATTENTION_BACKEND:-FLASH_ATTN}
-      - TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST:-}
+      - VLLM_USE_V1=${VLLM_USE_V1:-1}
+      - TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST:-9.0}
     networks:
       - llm-network
     restart: unless-stopped

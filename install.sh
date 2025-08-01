@@ -326,20 +326,22 @@ configure_infbox() {
 # Model configuration
 MODEL_NAME=$MODEL_NAME
 MODEL_PATH=$MODELS_DIR/$MODEL_SAFE_NAME
-PREC=fp8
+PREC=bfloat16
 GPU_COUNT=$GPU_COUNT
-GPU_UTIL=0.90
+GPU_UTIL=0.97
 CUDA_DEVICES=$(seq -s, 0 $((GPU_COUNT-1)))
 
 # Memory configuration
-CPU_GB=40
+CPU_GB=0
 DISK_GB=100
 
 # vLLM configuration
-MAX_MODEL_LEN=32768
-DTYPE=float16
+MAX_MODEL_LEN=238000
+DTYPE=bfloat16
 KV_CACHE_DTYPE=fp8
 QUANTIZATION=fp8
+VLLM_USE_V1=1
+TORCH_CUDA_ARCH_LIST=9.0
 
 # Service ports
 VLLM_PORT=8000
@@ -370,8 +372,11 @@ services:
       --gpu-memory-utilization ${GPU_UTIL}
       --quantization ${QUANTIZATION}
       --kv-cache-dtype ${KV_CACHE_DTYPE}
+      --cpu-offload-gb ${CPU_GB}
       --enable-prefix-caching
       --trust-remote-code
+      --enable-auto-tool-choice
+      --tool-call-parser qwen3_coder
     deploy:
       resources:
         reservations:
@@ -390,6 +395,8 @@ services:
       - HF_HOME=/models
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      - VLLM_USE_V1=${VLLM_USE_V1}
+      - TORCH_CUDA_ARCH_LIST=${TORCH_CUDA_ARCH_LIST}
     networks:
       - llm-network
     restart: unless-stopped
