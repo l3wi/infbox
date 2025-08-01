@@ -26,7 +26,7 @@ services:
     volumes:
       - ${MODELS_PATH:-./models}:/models:ro
       - ./cache:/cache
-      - ${WORKSPACE_DIR:-/root}:/workspace:ro
+      - ${WORKSPACE_DIR:-/root}:${WORKSPACE_DIR:-/root}:ro
     ports:
       - "${VLLM_PORT:-8000}:8000"
     environment:
@@ -51,11 +51,11 @@ services:
       context: .
       dockerfile: docker/Dockerfile.watcher
     volumes:
-      - ${WORKSPACE_DIR:-/root}:/workspace:ro
+      - ${WORKSPACE_DIR:-/root}:${WORKSPACE_DIR:-/root}:ro
       - ./scripts:/scripts:ro
       - ./config/watcher-ignore:/etc/watcher-ignore:ro
     environment:
-      - WATCH_DIR=/workspace
+      - WATCH_DIR=${WORKSPACE_DIR:-/root}
       - IGNORE_FILE=/etc/watcher-ignore
       - VLLM_ENDPOINT=http://vllm:8000
       - WATCH_INTERVAL=${WATCH_INTERVAL:-1}

@@ -23,7 +23,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from gitignore_parser import parse_gitignore
 
 # Configuration from environment
-WATCH_DIR = os.getenv("WATCH_DIR", "/workspace")
+WATCH_DIR = os.getenv("WATCH_DIR", os.path.expanduser("~"))
 IGNORE_FILE = os.getenv("IGNORE_FILE", ".gitignore")
 VLLM_ENDPOINT = os.getenv("VLLM_ENDPOINT", "http://vllm:8000")
 WATCH_INTERVAL = int(os.getenv("WATCH_INTERVAL", "1"))
@@ -162,19 +162,43 @@ class CodebaseWatcher(FileSystemEventHandler):
         self.ignore_file = ignore_file
         self.cache_manager = cache_manager
         self.file_hashes: Dict[str, str] = {}
-        self.gitignore_matcher = None
-        self._load_gitignore()
+        self.gitignore_matchers: Dict[str, any] = {}  # dir_path -> matcher
+        self.global_ignore_matcher = None
+        self._load_global_ignore()
         self._initial_scan()
     
-    def _load_gitignore(self):
-        """Load .gitignore patterns."""
-        gitignore_path = self.watch_dir / self.ignore_file
-        if gitignore_path.exists():
-            self.gitignore_matcher = parse_gitignore(gitignore_path)
-            logger.info(f"Loaded .gitignore from {gitignore_path}")
+    def _load_global_ignore(self):
+        """Load global ignore patterns."""
+        if os.path.exists(self.ignore_file):
+            self.global_ignore_matcher = parse_gitignore(self.ignore_file)
+            logger.info(f"Loaded global ignore from {self.ignore_file}")
         else:
-            self.gitignore_matcher = lambda x: False
-            logger.warning(f"No .gitignore found at {gitignore_path}")
+            self.global_ignore_matcher = lambda x: False
+    
+    def _get_gitignore_matcher(self, file_path: Path):
+        """Get the appropriate gitignore matcher for a file."""
+        # Check each parent directory for a .gitignore file
+        current = file_path.parent
+        while current >= self.watch_dir:
+            gitignore_path = current / ".gitignore"
+            
+            # Cache the matcher if we haven't loaded it yet
+            if str(current) not in self.gitignore_matchers:
+                if gitignore_path.exists():
+                    self.gitignore_matchers[str(current)] = parse_gitignore(gitignore_path)
+                else:
+                    self.gitignore_matchers[str(current)] = None
+            
+            # If we found a gitignore, use it
+            if self.gitignore_matchers[str(current)]:
+                return self.gitignore_matchers[str(current)]
+            
+            # Move up to parent directory
+            if current == current.parent:  # Reached root
+                break
+            current = current.parent
+        
+        return None
     
     def _should_ignore(self, path: Path) -> bool:
         """Check if file should be ignored."""
@@ -196,9 +220,23 @@ class CodebaseWatcher(FileSystemEventHandler):
             if pattern in path_str:
                 return True
         
-        # Check gitignore
-        if self.gitignore_matcher and self.gitignore_matcher(path_str):
+        # Check global ignore patterns
+        if self.global_ignore_matcher and self.global_ignore_matcher(path_str):
             return True
+        
+        # Check directory-specific gitignore
+        gitignore_matcher = self._get_gitignore_matcher(path)
+        if gitignore_matcher:
+            # Make path relative to the gitignore's directory for proper matching
+            try:
+                for parent in path.parents:
+                    if (parent / ".gitignore").exists():
+                        rel_path = path.relative_to(parent)
+                        if gitignore_matcher(str(rel_path)):
+                            return True
+                        break
+            except ValueError:
+                pass
         
         # Skip binary and media files
         binary_extensions = {'.pyc', '.pyo', '.so', '.dylib', '.dll', '.exe',
@@ -236,6 +274,7 @@ class CodebaseWatcher(FileSystemEventHandler):
             # Detect language from extension
             ext_to_lang = {
                 '.py': 'python', '.js': 'javascript', '.ts': 'typescript',
+                '.jsx': 'javascript', '.tsx': 'typescript', '.mjs': 'javascript',
                 '.go': 'go', '.rs': 'rust', '.java': 'java', '.cpp': 'cpp',
                 '.rb': 'ruby', '.php': 'php', '.swift': 'swift', '.c': 'c',
                 '.h': 'c', '.hpp': 'cpp', '.cs': 'csharp', '.kt': 'kotlin',
