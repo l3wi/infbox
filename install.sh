@@ -319,6 +319,33 @@ EOF
 configure_infbox() {
     log "Configuring InfBox for Qwen3-Coder-480B..."
     
+    # Create config directory
+    mkdir -p "$INSTALL_DIR/config"
+    
+    # Create Caddyfile
+    cat > "$INSTALL_DIR/config/Caddyfile" << 'CADDYEOF'
+# Caddyfile for Multi-GPU LLM Inference Stack
+# Provides automatic HTTPS and reverse proxy
+
+# Listen on port 5555 and expose to internet
+:5555 {
+    # Reverse proxy ALL requests to vLLM
+    reverse_proxy * vllm:8000
+    
+    # Request/response logging
+    log {
+        output stdout
+        format console
+    }
+}
+
+# Also keep port 80 for basic HTTP
+:80 {
+    # Redirect to port 5555
+    redir http://{host}:5555{uri} permanent
+}
+CADDYEOF
+    
     # Create .env file
     cat > "$INSTALL_DIR/.env" << EOF
 # InfBox configuration for Qwen3-Coder-480B-A35B-Instruct-FP8
@@ -428,9 +455,28 @@ services:
     depends_on:
       - vllm
 
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+      - "5555:5555"
+    volumes:
+      - ./config/Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - llm-network
+    restart: unless-stopped
+
 networks:
   llm-network:
     driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
 EOF
 }
 
@@ -461,11 +507,14 @@ Quick Start:
 3. Monitor logs:
    docker compose logs -f vllm
 
-4. Test the API:
+4. Test the API (internal):
    curl http://localhost:8000/v1/models
 
-5. Send a test request:
-   curl http://localhost:8000/v1/chat/completions \\
+5. Test the API (external):
+   curl http://YOUR_SERVER_IP:5555/v1/models
+
+6. Send a test request:
+   curl http://localhost:5555/v1/chat/completions \\
      -H "Content-Type: application/json" \\
      -d '{
        "model": "Qwen3-Coder-480B-A35B-Instruct-FP8",
@@ -482,10 +531,19 @@ Service Management:
 
 API Endpoints:
 -------------
+Internal (container network):
 - Health check: http://localhost:8000/health
 - Models list: http://localhost:8000/v1/models
 - Chat completions: http://localhost:8000/v1/chat/completions
 - Completions: http://localhost:8000/v1/completions
+
+External (internet accessible):
+- Health check: http://YOUR_SERVER_IP:5555/health
+- Models list: http://YOUR_SERVER_IP:5555/v1/models
+- Chat completions: http://YOUR_SERVER_IP:5555/v1/chat/completions
+- Completions: http://YOUR_SERVER_IP:5555/v1/completions
+
+Note: Port 5555 is exposed to the internet via Caddy reverse proxy
 
 Workspace Monitoring:
 -------------------
@@ -613,7 +671,9 @@ EOF
     log "==================================="
     log ""
     log "InfBox is now running with Qwen3-Coder-480B"
-    log "API endpoint: http://localhost:8000"
+    log "API endpoints:"
+    log "  - Internal: http://localhost:8000"
+    log "  - External: http://$(hostname -I | awk '{print $1}'):5555"
     log ""
     log "See $INSTRUCTIONS_FILE for detailed instructions"
     log ""

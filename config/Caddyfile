@@ -1,31 +1,22 @@
 # Caddyfile for Multi-GPU LLM Inference Stack
 # Provides automatic HTTPS and reverse proxy
 
-# Replace with your domain
-:80 {
-    # Reverse proxy to vLLM
-    reverse_proxy /v1/* vllm:8000
-    
-    # Health endpoints
-    handle /health {
-        respond "OK" 200
-    }
-    
-    # Metrics endpoint (if enabled)
-    handle /metrics {
-        reverse_proxy vllm:8000
-    }
-    
-    # Default response
-    handle {
-        respond "Multi-GPU LLM Inference Stack" 200
-    }
+# Listen on port 5555 and expose to internet
+:5555 {
+    # Reverse proxy ALL requests to vLLM
+    reverse_proxy * vllm:8000
     
     # Request/response logging
     log {
         output stdout
         format console
     }
+}
+
+# Also keep port 80 for basic HTTP
+:80 {
+    # Redirect to port 5555
+    redir http://{host}:5555{uri} permanent
 }
 
 # HTTPS configuration (when domain is set)
