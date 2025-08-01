@@ -2,7 +2,7 @@ services:
   vllm:
     image: vllm/vllm-openai:latest
     command: >
-      ${MODEL_PATH:-/models/Qwen_Qwen3-Coder-480B-A35B-Instruct-FP8}
+      /models/${MODEL_SAFE_NAME:-Qwen_Qwen3-Coder-480B-A35B-Instruct-FP8}
       --host 0.0.0.0
       --port 8000
       --tensor-parallel-size ${GPU_COUNT:-4}
@@ -24,14 +24,15 @@ services:
               count: all
               capabilities: [gpu]
     volumes:
-      - ${MODELS_PATH:-./models}:/models:ro
+      - ${MODELS_PATH:-~/models}:/models:ro
       - ./cache:/cache
+      - ./hf_cache:/root/.cache/huggingface
       - ${WORKSPACE_DIR:-/root}:${WORKSPACE_DIR:-/root}:ro
     ports:
       - "${VLLM_PORT:-8000}:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=${CUDA_DEVICES:-0,1,2,3}
-      - HF_HOME=/models
+      - HF_HOME=/root/.cache/huggingface
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
       - VLLM_ATTENTION_BACKEND=${ATTENTION_BACKEND:-FLASH_ATTN}

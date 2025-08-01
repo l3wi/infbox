@@ -353,6 +353,7 @@ CADDYEOF
 # Model configuration
 MODEL_NAME=$MODEL_NAME
 MODEL_PATH=$MODELS_DIR/$MODEL_SAFE_NAME
+MODEL_SAFE_NAME=$MODEL_SAFE_NAME
 PREC=bfloat16
 GPU_COUNT=$GPU_COUNT
 GPU_UTIL=0.97
@@ -386,12 +387,12 @@ LOG_LEVEL=INFO
 EOF
 
     # Update docker-compose.yml to use the FP8 model
-    cat > "$INSTALL_DIR/docker-compose.yml" << 'EOF'
+    cat > "$INSTALL_DIR/docker-compose.yml" << EOF
 services:
   vllm:
     image: vllm/vllm-openai:latest
     command: >
-      ${MODEL_PATH}
+      /models/${MODEL_SAFE_NAME}
       --host 0.0.0.0
       --port 8000
       --tensor-parallel-size ${GPU_COUNT}
@@ -415,12 +416,13 @@ services:
     volumes:
       - ${MODELS_PATH}:/models:ro
       - ./cache:/cache
+      - ./hf_cache:/root/.cache/huggingface
       - ${WORKSPACE_DIR}:${WORKSPACE_DIR}:ro
     ports:
       - "${VLLM_PORT}:8000"
     environment:
       - CUDA_VISIBLE_DEVICES=${CUDA_DEVICES}
-      - HF_HOME=/models
+      - HF_HOME=/root/.cache/huggingface
       - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
       - VLLM_USE_V1=${VLLM_USE_V1}
