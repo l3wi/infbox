@@ -219,21 +219,23 @@ check_system_requirements() {
 # ================================
 
 clone_repository() {
-    log "Cloning InfBox repository..."
+    log "Preparing InfBox repository..."
     
     if [ -d "$INSTALL_DIR" ]; then
         warn "Installation directory already exists: $INSTALL_DIR"
-        read -p "Remove existing installation and continue? (y/N) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            error "Installation cancelled"
-            exit 1
+        log "Using existing installation directory"
+        cd "$INSTALL_DIR"
+        
+        # Update to latest version
+        if [ -d ".git" ]; then
+            log "Updating to latest version..."
+            git pull origin main || warn "Could not update repository"
         fi
-        rm -rf "$INSTALL_DIR"
+    else
+        log "Cloning InfBox repository..."
+        git clone "$REPO_URL" "$INSTALL_DIR"
+        cd "$INSTALL_DIR"
     fi
-    
-    git clone "$REPO_URL" "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
 }
 
 download_model() {
