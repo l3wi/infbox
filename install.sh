@@ -349,6 +349,7 @@ VLLM_PORT=8000
 # Workspace
 WORKSPACE_DIR=$HOME
 WATCH_INTERVAL=1
+EXTRA_IGNORE_DIRS=infbox,models
 
 # Model storage
 MODELS_PATH=$MODELS_DIR
@@ -413,12 +414,14 @@ services:
     volumes:
       - ${WORKSPACE_DIR}:/workspace:ro
       - ./scripts:/scripts:ro
+      - ./config/watcher-ignore:/etc/watcher-ignore:ro
     environment:
       - WATCH_DIR=/workspace
-      - IGNORE_FILE=.gitignore
+      - IGNORE_FILE=/etc/watcher-ignore
       - VLLM_ENDPOINT=http://vllm:8000
       - WATCH_INTERVAL=${WATCH_INTERVAL}
       - LOG_LEVEL=${LOG_LEVEL}
+      - EXTRA_IGNORE_DIRS=${EXTRA_IGNORE_DIRS}
     networks:
       - llm-network
     restart: unless-stopped

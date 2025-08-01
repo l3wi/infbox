@@ -1,0 +1,107 @@
+# Watcher ignore patterns
+# This file is used by the watcher to ignore certain directories and files
+
+# Ignore the infbox installation directory itself
+infbox/
+/infbox/
+*/infbox/*
+
+# Ignore model directories
+models/
+/models/
+*/models/*
+
+# System and temp files
+.git/
+.DS_Store
+*.swp
+*.swo
+*~
+.#*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.iml
+.project
+.classpath
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+target/
+out/
+
+# Docker
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Large files
+*.tar
+*.tar.gz
+*.zip
+*.7z
+*.rar
+*.iso
+*.dmg
+
+# Media files
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.ico
+*.mp3
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.pdf
+
+# Binary files
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.dat
+
+# Credentials
+.env
+.env.*
+*.pem
+*.key
+*.cert
+*.crt

@@ -30,6 +30,7 @@ WATCH_INTERVAL = int(os.getenv("WATCH_INTERVAL", "1"))
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 CACHE_BATCH_SIZE = int(os.getenv("CACHE_BATCH_SIZE", "5"))
 CACHE_MAX_FILE_SIZE = int(os.getenv("CACHE_MAX_FILE_SIZE", "100000"))  # 100KB
+EXTRA_IGNORE_DIRS = os.getenv("EXTRA_IGNORE_DIRS", "").split(",") if os.getenv("EXTRA_IGNORE_DIRS") else []
 
 # Setup logging
 logging.basicConfig(
@@ -185,6 +186,12 @@ class CodebaseWatcher(FileSystemEventHandler):
         }
         
         path_str = str(path)
+        
+        # Check extra ignore directories from environment
+        for ignore_dir in EXTRA_IGNORE_DIRS:
+            if ignore_dir and ignore_dir in path_str:
+                return True
+        
         for pattern in ignore_patterns:
             if pattern in path_str:
                 return True
