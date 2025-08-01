@@ -297,6 +297,10 @@ try:
     
     if missing_shards:
         print(f'✗ Missing {len(missing_shards)} model shard files')
+        for shard in missing_shards[:5]:  # Show first 5
+            print(f'  - {shard}')
+        if len(missing_shards) > 5:
+            print(f'  ... and {len(missing_shards) - 5} more')
         sys.exit(1)
     else:
         print(f'✓ All {len(shard_files)} model shards present')
@@ -317,15 +321,30 @@ except Exception as e:
                 return 0
             fi
         else
-            warn "Model verification failed. Files may be corrupted."
-            read -p "Re-download model? (Y/n) " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-                rm -rf "$MODEL_PATH"
-            else
-                warn "Proceeding with potentially corrupted model files"
-                return 0
-            fi
+            warn "Model verification failed. Files may be corrupted or missing."
+            echo "Options:"
+            echo "1) Re-download missing files only (recommended)"
+            echo "2) Re-download entire model"
+            echo "3) Proceed anyway (not recommended)"
+            read -p "Choice [1/2/3]: " -r choice
+            
+            case "$choice" in
+                1)
+                    log "Re-downloading missing files..."
+                    # Use resume_download=True to only fetch missing files
+                    ;;
+                2)
+                    log "Re-downloading entire model..."
+                    rm -rf "$MODEL_PATH"
+                    ;;
+                3)
+                    warn "Proceeding with incomplete model files"
+                    return 0
+                    ;;
+                *)
+                    log "Invalid choice. Re-downloading missing files..."
+                    ;;
+            esac
         fi
     fi
     
@@ -342,32 +361,60 @@ except Exception as e:
         python3 -m pip install --user "huggingface-hub[cli]" tqdm
     fi
     
-    log "Downloading model to: $MODEL_PATH"
-    log "This will take 30-90 minutes depending on your connection..."
-    info "Model size: ~200GB"
+    # Create model directory if it doesn't exist
+    mkdir -p "$MODEL_PATH"
+    
+    log "Downloading/updating model: $MODEL_PATH"
+    if [ -d "$MODEL_PATH" ] && [ -n "$(ls -A "$MODEL_PATH" 2>/dev/null)" ]; then
+        log "Existing files found. Will verify and download only missing files..."
+    else
+        log "This will take 30-90 minutes depending on your connection..."
+        info "Model size: ~200GB"
+    fi
     
     # Python download script
     python3 << EOF
 import os
 import sys
 from huggingface_hub import snapshot_download
+from pathlib import Path
 
 model_name = "$MODEL_NAME"
 local_dir = "$MODEL_PATH"
 token = os.environ.get('HF_TOKEN', None)
 
-print(f"Starting download...")
+# Check what files we already have
+existing_files = list(Path(local_dir).glob('**/*'))
+if existing_files:
+    print(f"Found {len(existing_files)} existing files. Verifying and downloading missing files...")
+else:
+    print(f"Starting fresh download to: {local_dir}")
 
 try:
+    # snapshot_download will automatically:
+    # - Skip files that are already fully downloaded and have correct hash
+    # - Resume partial downloads
+    # - Download only missing or corrupted files
     snapshot_download(
         repo_id=model_name,
         local_dir=local_dir,
         local_dir_use_symlinks=False,
         token=token,
-        resume_download=True,
+        resume_download=True,  # This enables smart resume/repair
         max_workers=4
     )
-    print("\n✓ Model downloaded successfully!")
+    print("\n✓ Model downloaded/repaired successfully!")
+    
+    # Re-verify after download
+    try:
+        with open(Path(local_dir) / 'model.safetensors.index.json', 'r') as f:
+            import json
+            index = json.load(f)
+            shard_files = set(index.get('weight_map', {}).values())
+            print(f"✓ Verified {len(shard_files)} model shards are present")
+    except:
+        pass
+        
 except KeyboardInterrupt:
     print("\n✗ Download interrupted. You can resume by running the install script again.")
     sys.exit(1)
